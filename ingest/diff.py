@@ -1,6 +1,7 @@
 import pysbd 
 from rapidfuzz import fuzz 
 import difflib
+from ingest.materiality import score_change
 
 from ingest.normalize import clean_section # taking the clean sections into this file 
 
@@ -47,7 +48,8 @@ if __name__ == "__main__":
             old_words = old_sentence.split()
             new_words = matched_text.split()
             matcher = difflib.SequenceMatcher(None, old_words, new_words)
-            print(f"[MODIFIED] ({score:.1f})")
+            materiality = score_change(old_sentence, score)
+            print(f"[MODIFIED] (sim {score:.1f} | material {materiality:.0f})")
             for tag, i1, i2, j1, j2 in matcher.get_opcodes():
                 if tag != "equal":
                     print(f"   {old_words[i1:i2]} -> {new_words[j1:j2]}")
