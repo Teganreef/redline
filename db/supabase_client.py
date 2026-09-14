@@ -1,4 +1,5 @@
 import os
+from datetime import datetime, timezone
 from supabase import create_client
 
 
@@ -54,3 +55,21 @@ def insert_diffs(client, filing_id, rows):
 
     client.table("diffs").insert(payload).execute()
     return len(payload)
+
+
+def is_processed(client, accession_number):
+    result = (
+        client.table("filings")
+        .select("processed_at")
+        .eq("accession_number", accession_number)
+        .limit(1)
+        .execute()
+    )
+    return bool(result.data) and result.data[0]["processed_at"] is not None
+
+
+def mark_processed(client, filing_id):
+    # called last, after diffs are saved, so a run that dies halfway gets redone
+    client.table("filings").update(
+        {"processed_at": datetime.now(timezone.utc).isoformat()}
+    ).eq("id", filing_id).execute()

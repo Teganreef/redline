@@ -5,15 +5,22 @@ on:
     - cron: "*/30 * * * *"
   workflow_dispatch: {}
 
+# never let two runs overlap
+concurrency:
+  group: poll
+  cancel-in-progress: false
+
 jobs:
   poll:
     runs-on: ubuntu-latest
+    timeout-minutes: 15  # a stuck run gets stopped instead of hanging
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+          cache: pip
 
       - name: Install dependencies
         run: pip install -r requirements.txt

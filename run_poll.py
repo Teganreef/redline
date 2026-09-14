@@ -15,7 +15,7 @@ load_dotenv()  # picks up SUPABASE_URL / SUPABASE_KEY from a local .env; no-op i
 from ingest.extract import extract_item_1a
 from ingest.normalize import clean_section
 from ingest.diff import split_sentences, classify_and_score
-from db.supabase_client import get_client, insert_filing, insert_diffs
+from db.supabase_client import get_client, insert_filing, insert_diffs, is_processed, mark_processed
 
 WATCHLIST = ["AAPL", "MSFT", "GOOGL", "NVDA", "IONQ", "CEG", "VST", "ZS", "SOFI", "AVAV"]
 
@@ -88,42 +88,52 @@ def collapse_and_select_two(filings):
     return [by_period[p] for p in newest_periods]
 
 
-def get_annual_filings(ticker):
-    """
-    Returns the two most recent annual filings for ticker, newest first.
-
-    Returns [] and logs a skip for a foreign private issuer that only
-    files 20-F (out of scope). Returns fewer than 2 filings for an
-    IPO-year company with no prior annual filing - caller treats that as
-    a baseline, not a diff.
-    """
-    company = Company(ticker)
-    filings = company.get_filings(form=["10-K", "10-K/A", "20-F"])
-
-    if is_foreign_private_issuer_only(filings):
-        print(f"[{ticker}] SKIP: only files 20-F (foreign private issuer), out of scope")
-        return []
-
+def latest_annual_filing(filings):
+    # most recently filed 10-K or 10-K/A; reads only the filing index, no download
     annual = [f for f in filings if f.form in ANNUAL_FORMS]
-    return collapse_and_select_two(annual)
+    if not annual:
+        return None
+    return max(annual, key=lambda f: f.filing_date)
+
+
+def mark_seen(client, ticker, filing):
+    filing_id = insert_filing(client, ticker, filing.cik, filing.form, filing.filing_date, filing.accession_no)
+    mark_processed(client, filing_id)
 
 
 def process_ticker(client, ticker):
-    filings = get_annual_filings(ticker)
-    if not filings:
+    filings = Company(ticker).get_filings(form=["10-K", "10-K/A", "20-F"])
+
+    if is_foreign_private_issuer_only(filings):
+        print(f"[{ticker}] SKIP: only files 20-F (foreign private issuer), out of scope")
         return
 
-    if len(filings) < 2:
-        f = filings[0]
+    latest = latest_annual_filing(filings)
+    if latest is None:
+        print(f"[{ticker}] SKIP: no 10-K on file yet")
+        return
+
+    # Cheap check before any download: if the newest filing was already
+    # handled on an earlier run, nothing new has been filed.
+    if is_processed(client, latest.accession_no):
+        print(f"[{ticker}] up to date ({latest.accession_no})")
+        return
+
+    selected = collapse_and_select_two([f for f in filings if f.form in ANNUAL_FORMS])
+
+    if len(selected) < 2:
+        f = selected[0]
         print(f"[{ticker}] BASELINE: no prior annual filing to diff against ({f.accession_no}), logging only")
         insert_filing(client, ticker, f.cik, f.form, f.filing_date, f.accession_no)
+        mark_seen(client, ticker, latest)
         return
 
-    newer, older = filings[0], filings[1]
+    newer, older = selected[0], selected[1]
 
     newer_text = get_item_1a_text(newer)
     older_text = get_item_1a_text(older)
 
+    # not marked processed, so the next run retries it
     if newer_text is None:
         print(f"[{ticker}] MANUAL REVIEW: Item 1A extraction failed for {newer.accession_no}")
         return
@@ -133,6 +143,7 @@ def process_ticker(client, ticker):
 
     if is_incorporated_by_reference(newer_text) or is_incorporated_by_reference(older_text):
         print(f"[{ticker}] SKIP: risk factors incorporated by reference, nothing to diff")
+        mark_seen(client, ticker, latest)
         return
 
     old_sentences = split_sentences(clean_section(older_text))
@@ -145,6 +156,7 @@ def process_ticker(client, ticker):
     newer_id = insert_filing(client, ticker, newer.cik, newer.form, newer.filing_date, newer.accession_no)
 
     inserted = insert_diffs(client, newer_id, changed_rows)
+    mark_seen(client, ticker, latest)
     print(f"[{ticker}] {newer.accession_no}: {inserted} changed sentences persisted "
           f"(of {len(changed_rows)} found, {len(rows) - len(changed_rows)} unchanged)")
 

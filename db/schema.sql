@@ -11,6 +11,10 @@ create table if not exists filings (
     created_at timestamptz not null default now()
 );
 
+-- Set once a filing is fully handled (diffs saved, or logged as a baseline
+-- or skip). The poller skips filings that have it, so most runs download nothing.
+alter table filings add column if not exists processed_at timestamptz;
+
 create table if not exists diffs (
     id bigint generated always as identity primary key,
     filing_id bigint not null references filings(id) on delete cascade,
