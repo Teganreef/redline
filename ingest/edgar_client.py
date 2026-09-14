@@ -1,4 +1,5 @@
 from edgar import Company, set_identity
+from ingest.extract import extract_item_1a
 
 def get_two_aapl_10ks():
     set_identity("Tegan Dowd teganreef.d@gmail.com")
@@ -26,8 +27,8 @@ if __name__ == "__main__":
     tenk_1 = filing_1.obj()
     tenk_2 = filing_2.obj()
 
-    risk_factors_1 = tenk_1.risk_factors
-    risk_factors_2 = tenk_2.risk_factors
+    risk_factors_1 = extract_item_1a(tenk_obj=tenk_1, full_text=filing_1.text())
+    risk_factors_2 = extract_item_1a(tenk_obj=tenk_2, full_text=filing_2.text())
 
     print("Risk factors 1 length:", len(risk_factors_1))
     print("Risk factors 2 length:", len(risk_factors_2))

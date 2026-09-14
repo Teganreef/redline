@@ -1,0 +1,13 @@
+UNITED STATES SECURITIES AND EXCHANGE COMMISSION
+FORM 10-K
+
+Item 1. Business
+The Company designs, manufactures, and markets widgets.
+
+Item 1A. Risk Factors
+
+Our business is subject to a number of risks. Demand for our products could
+decline. Our supply chain could be disrupted by geopolitical events.
+
+Item 1B. Unresolved Staff Comments
+None.

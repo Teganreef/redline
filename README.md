@@ -26,6 +26,8 @@ Python, edgartools, pysbd, rapidfuzz, difflib, pytest
 
 ## Status
 
-Built: EDGAR ingestion, normalization, sentence segmentation, sentence alignment and classification, word level diffing. Verified against Apple's 2024 and 2025 10-K filings.
+Built: EDGAR ingestion, normalization, sentence segmentation, sentence alignment and classification, word level diffing, materiality scoring for all four change types (unchanged, modified, added, deleted), Item 1A extraction with a fallback chain (edgartools object attribute, then regex, then flag for manual review), a Supabase schema and client for storing filing metadata and changed sentences only, and a `run_poll.py` orchestrator wired to the ten-ticker watchlist and a GitHub Actions cron job on the free tier. Verified against Apple's 2024 and 2025 10-K filings, plus fixture-backed tests for 10-K/A amendments superseding the original, 10-Q risk factors incorporated by reference, IPO-year companies with no prior filing, and 20-F foreign private issuers.
 
-In progress: materiality scoring, Postgres persistence keyed on accession number, GitHub Actions scheduling, card rendering, automated posting.
+Not yet run end to end against live EDGAR data for the full watchlist — `run_poll.py` has not been exercised outside of fixtures and unit tests, and no Supabase project has been provisioned or verified against yet.
+
+Not built: card rendering, automated posting (Discord/X). Explicitly out of scope for now.

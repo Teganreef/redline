@@ -1,20 +1,44 @@
-import re 
+import re
+
+def strip_repeated_lines(text, min_repeats=3):
+    """
+    Page headers/footers (e.g. "Apple Inc. | 2025 Form 10-K | 6") repeat
+    once per page and sit on their own line - real prose sentences don't
+    repeat verbatim. The page number changes on every occurrence, so lines
+    are compared by a digit-normalized template ("Apple Inc. | #### Form
+    ##-K | #") rather than exact text. Templating instead of matching one
+    company's literal header means this works for any filer, not just Apple.
+    """
+    lines = text.split("\n")
+
+    def template(line):
+        return re.sub(r"\d+", "#", line.strip())
+
+    counts = {}
+    for line in lines:
+        t = template(line)
+        if t:
+            counts[t] = counts.get(t, 0) + 1
+
+    repeated_templates = {t for t, count in counts.items() if count >= min_repeats}
+    kept = [line for line in lines if template(line) not in repeated_templates]
+    return "\n".join(kept)
 
 def clean_section(text):
     text = text.replace("\xad","") #cleaning soft hypen chracter in document
-    text = text.replace("\xa0"," ") #cleaning non breaking space in document 
+    text = text.replace("\xa0"," ") #cleaning non breaking space in document
 
-    text = text.replace("\u201c",'"') #replacing the symbol characters in documents wiht actual symbols 
+    text = text.replace("\u201c",'"') #replacing the symbol characters in documents wiht actual symbols
     text = text.replace("\u201d",'"')
     text = text.replace("\u2018","'")
     text = text.replace("\u2019","'")
 
-    text = re.sub(r"Apple Inc\. \| \d{4} Form 10-K \| \d+", "", text) # taking regex module and removing repeating phrase 
-    text = re.sub(r"\s+"," ", text) # taking a regex module and grouping spacing to remove any extra spaces 
+    text = strip_repeated_lines(text) # remove any line (header/footer) that repeats across pages, regardless of company
+    text = re.sub(r"\s+"," ", text) # taking a regex module and grouping spacing to remove any extra spaces
 
     text = text.strip()
 
-    return text # returned clean txt 
+    return text # returned clean txt
 
 if __name__ == "__main__":
 
